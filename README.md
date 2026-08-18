@@ -114,14 +114,14 @@ curl -sD - http://127.0.0.1:8001/v1/chat/completions \
   }'
 ```
 
-From an OpenAI SDK, only the base URL needs to change:
+For example, from an OpenAI SDK, only the base URL needs to change:
 
 ```ts
 import OpenAI from "openai";
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  baseURL: "http://127.0.0.1:8001/v1",
+  baseURL: "http://127.0.0.1:8001/v1/chat/completions",
 });
 
 const completion = await client.chat.completions.create({
