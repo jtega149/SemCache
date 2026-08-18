@@ -1,23 +1,23 @@
 import type { Request, Response } from "express";
 import { CACHEABLE_FINISH_REASONS, isMapperError, lookupCache } from "../cache.ts";
 import {
-    payloadToOpenAIResponse,
+    payloadToOllamaResponse,
     storeChatCompletion,
-    streamEventToOpenAIChunk,
-    toCacheableFromOpenAI,
+    streamEventToOllamaLine,
+    toCacheableFromOllama,
 } from "../map.ts";
 import { getProvider } from "../providers/get_provider.ts";
 
-const openaiChatCompletions = async (req: Request, res: Response) => {
+const ollamaChat = async (req: Request, res: Response) => {
     try {
-        const cacheKey = toCacheableFromOpenAI(req.body);
+        const cacheKey = toCacheableFromOllama(req.body);
         const lookup = await lookupCache(cacheKey);
         if (lookup.cached && lookup.payload) {
             res.setHeader("X-Cache", "HIT");
-            return res.json(payloadToOpenAIResponse(lookup.payload));
+            return res.json(payloadToOllamaResponse(lookup.payload));
         }
 
-        const provider = getProvider("openai");
+        const provider = getProvider("ollama");
         const providerReq = {
             model: cacheKey.model,
             messages: req.body.messages ?? [],
@@ -27,7 +27,7 @@ const openaiChatCompletions = async (req: Request, res: Response) => {
 
         res.setHeader("X-Cache", "MISS");
         if (req.body.stream) {
-            res.setHeader("Content-Type", "text/event-stream");
+            res.setHeader("Content-Type", "application/x-ndjson");
             let fullText = "";
             let finishReason = "";
             let modelId = cacheKey.model;
@@ -42,10 +42,9 @@ const openaiChatCompletions = async (req: Request, res: Response) => {
                 modelId = event.model;
                 promptTokens = event.promptTokens;
                 completionTokens = event.completionTokens;
-                res.write(`data: ${JSON.stringify(streamEventToOpenAIChunk(event))}\n\n`);
+                res.write(`${JSON.stringify(streamEventToOllamaLine(event))}\n`);
             }
 
-            res.write("data: [DONE]\n\n");
             res.end();
 
             if (fullText && CACHEABLE_FINISH_REASONS.has(finishReason)) {
@@ -64,12 +63,12 @@ const openaiChatCompletions = async (req: Request, res: Response) => {
         if (payload.text && CACHEABLE_FINISH_REASONS.has(payload.finish_reason)) {
             await storeChatCompletion(cacheKey, payload);
         }
-        return res.json(payloadToOpenAIResponse(payload));
+        return res.json(payloadToOllamaResponse(payload));
     } catch (error) {
         if (isMapperError(error)) {
             return res.status(400).json({ error: error.message });
         }
-        console.error("Error in OpenAI chat completions:", error);
+        console.error("Error in Ollama chat:", error);
         if (error instanceof Error && error.message.startsWith("Similarity lookup failed")) {
             return res.status(502).json({ error: "Similarity lookup failed" });
         }
@@ -77,4 +76,4 @@ const openaiChatCompletions = async (req: Request, res: Response) => {
     }
 };
 
-export default openaiChatCompletions;
+export default ollamaChat;
