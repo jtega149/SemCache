@@ -2,13 +2,17 @@
 
 SemCache is a semantic caching layer for LLM APIs. It sits between your application and the provider, reuses answers for prompts that mean the same thing, and returns them without another model call.
 
-Point your OpenAI client at the proxy instead of `api.openai.com`. Semantically similar chat completions can be served from cache; everything else is forwarded to OpenAI and stored for next time.
+## Built for OpenAI, Anthropic, and Ollama clients
+
+Point your OpenAI, Anthropic, or Ollama client at the proxy instead of their respective endpoints, we handle that for you. Semantically similar chat completions can be served from cache, everything else is forwarded to their respective endpoints that you would have initially tried to call.
 
 ```
-App  →  Node proxy (:8001)  →  Python similarity API (:8000)  →  Redis Stack
-                │                         │
-                └─ on miss: OpenAI chat ──┘  embed + vector lookup
+App  -->   Node proxy (:8001)     -->       FastAPI similarity API (:8000)   -->    Redis Stack
+             │                                                  │
+             └─ on miss: OpenAI / Anthropic / Ollama API call ──┘  embed + vector lookup
 ```
+
+
 
 ## How it works
 
