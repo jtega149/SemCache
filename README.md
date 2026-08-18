@@ -46,17 +46,20 @@ cp services/similarity/.env.example services/similarity/.env
 cp services/proxy/.env.example services/proxy/.env
 ```
 
-In **both** `.env` files, set `OPENAI_API_KEY`.
-
 In `services/proxy/.env`:
 
 ```bash
+# At least one api key or ollama base url is needed to run
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
 SIMILARITY_API_URL=http://127.0.0.1:8000
+OLLAMA_BASE_URL=http://127.0.0.1:11434
 ```
 
 `services/similarity/.env` defaults (from `.env.example`):
 
 ```bash
+OPEN_API_KEY=your-api-key
 REDIS_URL=redis://localhost:6379
 SIMILARITY_THRESHOLD=0.95
 DEFAULT_TTL_SECONDS=86400
@@ -125,6 +128,43 @@ const completion = await client.chat.completions.create({
   model: "gpt-4o-mini",
   messages: [{ role: "user", content: "What is semantic caching?" }],
 });
+```
+
+Also test out streaming (only works on cache miss)
+```bash
+curl -sN -D - -X POST http://127.0.0.1:8001/openai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-4o-mini","messages":[{"role":"user","content":"What is the capital of France?"}],"temperature":0.3,"max_tokens":100,"stream":true}'
+```
+
+Anthropic Tests:
+```bash
+# Non-stream
+curl -sD - -X POST http://127.0.0.1:8001/anthropic/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-5","max_tokens":100,"temperature":0.3,"messages":[{"role":"user","content":"What is the capital of France?"}]}'
+```
+
+```bash
+# Stream
+curl -sN -D - -X POST http://127.0.0.1:8001/anthropic/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{"model":"claude-sonnet-4-5","max_tokens":100,"temperature":0.3,"messages":[{"role":"user","content":"What is the capital of France?"}],"stream":true}'
+```
+
+Ollama tests (switch out llama3.2:latest for your local model)
+```bash
+# Non - Streaming
+curl -sD - -X POST http://127.0.0.1:8001/ollama/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.2:latest","messages":[{"role":"user","content":"What is the capital of France?"}],"options":{"temperature":0.3,"num_predict":100}}'
+```
+
+```bash
+# Stream
+curl -sD - -X POST http://127.0.0.1:8001/ollama/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.2:latest","messages":[{"role":"user","content":"What is the capital of France?"}],"options":{"temperature":0.3,"num_predict":100}}'
 ```
 
 ## Reset Redis
