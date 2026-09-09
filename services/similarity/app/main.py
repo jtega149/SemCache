@@ -4,8 +4,10 @@ from app.embeddings.openai import embed
 from app.store.vector import upsert, search
 from app.cache.key import build_namespace
 from app.cache.policy import record_hit
+from app.api.routes.delete_route import router as delete_router
 
 app = FastAPI()
+app.include_router(delete_router)
 
 @app.get("/")
 async def root():

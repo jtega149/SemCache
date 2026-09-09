@@ -29,3 +29,17 @@ class StoreRequest(CacheableRequest):
 class StoreResponse(BaseModel):
     id: str
     success: bool
+
+class DeleteNamespaceRequest(BaseModel):
+    system_prompt: str
+    model: str
+    temperature: float
+    max_tokens: int
+
+class DeleteSystemPromptRequest(BaseModel):
+    system_prompt: str
+
+class DeleteResponse(BaseModel):
+    success: bool
+    deleted: int = 0
+    error: str | None = None
