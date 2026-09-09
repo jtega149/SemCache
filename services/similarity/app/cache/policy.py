@@ -19,3 +19,4 @@ async def record_hit(result: dict) -> bool:
         return False
     result["hit_count"] = await increment_hit_count(result["id"])
     return True
+
