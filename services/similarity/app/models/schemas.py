@@ -27,7 +27,7 @@ class StoreRequest(CacheableRequest):
     llm_payload: LlmPayload
 
 class StoreResponse(BaseModel):
-    id: str
+    id: str | None = None
     success: bool
 
 class DeleteNamespaceRequest(BaseModel):

@@ -4,6 +4,7 @@ from app.embeddings.openai import embed
 from app.store.vector import upsert, search
 from app.cache.key import build_namespace
 from app.cache.policy import record_hit
+from app.cache.ttl import ttl_for_prompt
 from app.api.routes.delete_route import router as delete_router
 
 app = FastAPI()
@@ -26,9 +27,11 @@ async def lookup(request: LookupRequest):
 
 @app.post("/store", response_model=StoreResponse)
 async def store(request: StoreRequest):
+    if ttl_for_prompt(request.user_prompt) == 0:
+        return StoreResponse(id=None, success=True)
     vector = await embed(request.user_prompt)
     namespace = build_namespace(request.system_prompt, request.model, request.temperature, request.max_tokens)
     point_id = await upsert(vector, namespace, request.user_prompt, request.llm_payload)
     if point_id is None:
-        return StoreResponse(id=None, success=False)
+        return StoreResponse(id=None, success=True)
     return StoreResponse(id=point_id, success=True)

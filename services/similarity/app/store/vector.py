@@ -6,6 +6,7 @@ from redisvl.index import AsyncSearchIndex
 from redisvl.query import FilterQuery, VectorQuery
 from redisvl.query.filter import Tag
 
+from app.cache.ttl import ttl_for_prompt
 from app.config import settings
 from app.models.schemas import LlmPayload
 
@@ -81,13 +82,19 @@ async def upsert(
     namespace: str,
     user_prompt: str,
     payload: LlmPayload,
-) -> str:
-    """After a cache miss + LLM response, write the vector into Redis."""
+) -> str | None:
+    """After a cache miss + LLM response, write the vector into Redis.
+
+    Returns None when the TTL classifier says not to store (ttl == 0).
+    """
+    ttl_seconds = ttl_for_prompt(user_prompt)
+    if ttl_seconds <= 0:
+        return None
+
     index = await get_index()
 
     point_id = str(uuid4())
     created_at = datetime.now(UTC)
-    ttl_seconds = settings.default_ttl_seconds
     expires_at = created_at + timedelta(seconds=ttl_seconds)
 
     document = {
