@@ -60,13 +60,34 @@ def _matches(text: str, patterns: tuple[re.Pattern[str], ...]) -> bool:
     return any(pattern.search(text) for pattern in patterns)
 
 
-def ttl_for_prompt(user_prompt: str) -> int:
-    """Seconds to cache this prompt. 0 means do not store."""
+def classify_prompt(user_prompt: str) -> str:
     text = user_prompt.lower()
     if _matches(text, _SKIP_PATTERNS):
-        return TTL_SKIP
+        return "skip"
     if _matches(text, _SHORT_PATTERNS):
-        return TTL_SHORT_SECONDS
+        return "short"
     if _matches(text, _LONG_PATTERNS):
+        return "long"
+    return "default"
+
+
+def ttl_for_prompt(user_prompt: str) -> int:
+    """Seconds to cache this prompt. 0 means do not store."""
+    bucket = classify_prompt(user_prompt)
+    if bucket == "skip":
+        return TTL_SKIP
+    if bucket == "short":
+        return TTL_SHORT_SECONDS
+    if bucket == "long":
         return TTL_LONG_SECONDS
     return settings.default_ttl_seconds
+
+
+def threshold_for_prompt(user_prompt: str) -> float:
+    """Similarity cutoff for this lookup prompt."""
+    bucket = classify_prompt(user_prompt)
+    if bucket == "short":
+        return float(settings.threshold_strict)
+    if bucket == "long":
+        return float(settings.threshold_loose)
+    return float(settings.similarity_threshold)

@@ -21,7 +21,7 @@ async def lookup(request: LookupRequest):
     result = await search(vector, namespace)
     if result is None:
         return LookupResponse(cached=False, similarity_score=None, payload=None)
-    if await record_hit(result):
+    if await record_hit(result, request.user_prompt):
         return LookupResponse(cached=True, similarity_score=result["score"], payload=result["payload"])
     return LookupResponse(cached=False, similarity_score=None, payload=None)
 

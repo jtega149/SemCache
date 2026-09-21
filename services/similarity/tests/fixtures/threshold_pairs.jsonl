@@ -1,0 +1,8 @@
+{"query": "What is the capital of France?", "cached_prompt": "What's the capital of France?", "same_intent": true}
+{"query": "Who wrote Pride and Prejudice?", "cached_prompt": "Who is the author of Pride and Prejudice?", "same_intent": true}
+{"query": "Define photosynthesis", "cached_prompt": "What is photosynthesis?", "same_intent": true}
+{"query": "How does HTTP work?", "cached_prompt": "Explain how the HTTP protocol works", "same_intent": true}
+{"query": "What is the capital of Germany?", "cached_prompt": "What is the capital of France?", "same_intent": false}
+{"query": "Who wrote Sense and Sensibility?", "cached_prompt": "Who wrote Pride and Prejudice?", "same_intent": false}
+{"query": "What is cellular respiration?", "cached_prompt": "Define photosynthesis", "same_intent": false}
+{"query": "How does HTTPS work?", "cached_prompt": "How does HTTP work?", "same_intent": false}

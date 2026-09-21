@@ -20,7 +20,37 @@ App  -->   Node proxy (:8001)     -->       FastAPI similarity API (:8000)   -->
 2. It asks the similarity service to embed the **user** prompt and search Redis for a nearby vector.
 3. Entries are partitioned by **system prompt**, **model**, **temperature**, and **max_tokens**, so those cannot leak across use cases.
 4. If cosine similarity is at or above the threshold (default `0.95`) and the entry has not expired, the proxy returns the cached completion with `X-Cache: HIT`.
-5. On a miss, it calls OpenAI, returns the live response with `X-Cache: MISS`, and stores the completion when the finish reason is `stop` or `length`.
+5. On a miss, it calls the vendor, returns the live response with `X-Cache: MISS`, and stores the completion when the finish reason is `stop` or `length`.
+
+## API
+
+Your app talks to the **proxy** (`:8001`) using each vendor’s normal path. The proxy talks to the **similarity** service (`:8000`) to look up and save cache entries. On a miss it also calls the real OpenAI, Anthropic, or Ollama API.
+
+**You → proxy**
+
+| Method | URL | Same shape as |
+|---|---|---|
+| `POST` | `http://127.0.0.1:8001/openai/v1/chat/completions` | OpenAI chat completions |
+| `POST` | `http://127.0.0.1:8001/anthropic/v1/messages` | Anthropic Messages (`max_tokens` required) |
+| `POST` | `http://127.0.0.1:8001/ollama/api/chat` | Ollama chat |
+
+Responses include `X-Cache: HIT` or `X-Cache: MISS`.
+
+**Proxy → similarity** (you do not call these from the OpenAI/Anthropic/Ollama SDK)
+
+| Method | URL | When |
+|---|---|---|
+| `POST` | `http://127.0.0.1:8000/lookup` | Every request, before the vendor |
+| `POST` | `http://127.0.0.1:8000/store` | After a miss, if the answer finished with `stop` or `length` (and TTL is not 0) |
+
+**You → similarity** (optional: wipe cache)
+
+| Method | URL |
+|---|---|
+| `DELETE` | `http://127.0.0.1:8000/delete/namespace` |
+| `DELETE` | `http://127.0.0.1:8000/delete/system-prompt` |
+| `DELETE` | `http://127.0.0.1:8000/delete/model` |
+| `DELETE` | `http://127.0.0.1:8000/delete/prefix` |
 
 ## Tech stack
 
@@ -203,6 +233,18 @@ python -m pytest
 ```
 
 Use `python -m pytest` so the venv interpreter is used, not a system `pytest`.
+
+## Cache policy
+
+These four pieces sit on the similarity service. You do not need them to try a basic HIT/MISS; they decide **what we keep**, **how picky a match is**, and **how to wipe Redis** without restarting.
+
+**Invalidation.** Deleting cache on purpose. HTTP `DELETE` on the similarity API (`:8000`) can drop entries for one exact cache “room” (same system prompt + model + temperature + max tokens), everything for a system prompt, everything for a model name, or Redis keys that share a prefix. A delete that matches nothing is still success (`deleted: 0`). That is how you forget stale answers without dropping the whole index.
+
+**TTL classifier.** TTL means “time to live” — how many seconds Redis should keep an answer. We look at the **user’s words** (simple keyword rules, not another LLM). Live or “right now” questions get **0** and are **not stored**. News-ish prompts get a short life (1 hour). Stable facts (“capital of France”) get a week. Everything else uses `DEFAULT_TTL_SECONDS` (one day). Skipping store still returns the live model answer; we just do not cache it.
+
+**Threshold tuner.** The similarity **threshold** is the minimum “how close is close enough” score (0 to 1) to reuse a cached answer. The tuner is a **homework assignment**, not live traffic. We keep a small list of prompt pairs labeled “same question” vs “different question,” pretend the cutoff is 0.90, 0.95, and 0.98, and print hit rate vs mistakes. Run it from `services/similarity` with `python -m app.cache.tuner`. It does **not** change production by itself.
+
+**Adaptive thresholds.** Live lookup no longer uses only 0.95. The same word-buckets as TTL pick a cutoff: stable facts are looser (`THRESHOLD_LOOSE`, 0.90) so paraphrases can hit; news-ish prompts are stricter (`THRESHOLD_STRICT`, 0.98) so we are less likely to serve the wrong cached answer; everything else stays `SIMILARITY_THRESHOLD` (0.95).
 
 ## Repo layout
 
