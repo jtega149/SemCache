@@ -20,7 +20,7 @@ App  -->   Node proxy (:8001)     -->       FastAPI similarity API (:8000)   -->
 2. It asks the similarity service to embed the **user** prompt and search Redis for a nearby vector.
 3. Entries are partitioned by **system prompt**, **model**, **temperature**, and **max_tokens**, so those cannot leak across use cases.
 4. If cosine similarity is at or above the threshold (default `0.95`) and the entry has not expired, the proxy returns the cached completion with `X-Cache: HIT`.
-5. On a miss, it calls the vendor, returns the live response with `X-Cache: MISS`, and stores the completion when the finish reason is `stop` or `length`.
+5. On a miss, it calls the vendor, returns the live response with `X-Cache: MISS`, and stores the completion when the finish reason is `stop` or `length`. If Redis found a neighbor that sat under the cutoff, that lookup is still a miss and the cached answer is not returned. The similarity response includes the neighbor’s score, the cutoff, and the gap between them.
 
 ## API
 
@@ -61,8 +61,7 @@ Responses include `X-Cache: HIT` or `X-Cache: MISS`.
 | Embeddings | OpenAI `text-embedding-3-small` (384 dims) | Semantic match on the user prompt |
 | Vector store | Redis Stack + RedisVL | JSON index, cosine KNN, TTL metadata |
 | Provider (today) | OpenAI Chat Completions | Fills the cache on miss |
-
-Prometheus, Grafana, docker-compose, streaming, and extra providers are planned, not in this repo yet.
+| Monitoring | Prometheus, Grafana | Lookup and store counts, drawn on a dashboard |
 
 ## Prerequisites
 
@@ -259,3 +258,20 @@ services/similarity/   # FastAPI embed + RedisVL lookup/store
 - Run uvicorn from `services/similarity` so `load_dotenv()` picks up that directory’s `.env`.
 - Changing embedding dimensions requires dropping the Redis index; see [Reset Redis](#reset-redis).
 - Cache hits are not streamed. Misses currently return the full OpenAI JSON body (no token streaming yet).
+
+## Monitoring
+
+`docker compose up --build` from the repo root starts Prometheus and Grafana with the rest of the stack.
+
+The similarity service counts each lookup and store, and prints those counts at `GET http://127.0.0.1:8000/metrics`. Prometheus copies that page every few seconds. Grafana draws them at `http://127.0.0.1:3000`. You can view the SemCache dashboard without logging in.
+
+For whatever time range is selected on the dashboard:
+
+| Panel | What it shows |
+|---|---|
+| Hit rate | Hits divided by all lookups, with the raw hit and miss counts beside it |
+| Near-miss gap | How far a found-but-rejected neighbor sat under the cutoff |
+| Lookup speed | A typical lookup and a slow one |
+| Stores | Answers saved, and prompts skipped because they were too time-sensitive |
+
+A miss on that dashboard is any lookup that was not a hit: nothing similar was stored, or a neighbor was found and rejected.
