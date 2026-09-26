@@ -46,6 +46,8 @@ export type LookupResponse = {
     cached: boolean;
     similarity_score: number | null;
     payload: LlmPayload | null;
+    threshold?: number | null;
+    gap?: number | null;
 };
 
 type ChatMessage = {
