@@ -36,6 +36,7 @@ openai==3.1.0
 packaging==26.3
 pluggy==1.6.0
 portalocker==3.2.0
+prometheus_client==0.26.0
 protobuf==7.35.1
 pydantic==2.13.4
 pydantic-extra-types==2.11.1
