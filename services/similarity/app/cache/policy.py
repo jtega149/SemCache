@@ -4,6 +4,15 @@ from app.cache.ttl import threshold_for_prompt
 from app.store.vector import increment_hit_count
 
 
+def neighbor_miss(score: float, query_prompt: str) -> tuple[float, float]:
+    """Cutoff for this prompt, and how far `score` sits under it.
+
+    A positive gap means the neighbor was below the cutoff.
+    """
+    threshold = threshold_for_prompt(query_prompt)
+    return threshold, threshold - score
+
+
 def isHit(score: float, expires_at: float, query_prompt: str) -> bool:
     threshold = threshold_for_prompt(query_prompt)
     if score < threshold:

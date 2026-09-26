@@ -22,6 +22,8 @@ class LookupResponse(BaseModel):
     cached: bool
     similarity_score: float | None = None
     payload: LlmPayload | None = None
+    threshold: float | None = None
+    gap: float | None = None
 
 class StoreRequest(CacheableRequest):
     llm_payload: LlmPayload

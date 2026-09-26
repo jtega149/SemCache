@@ -4,7 +4,7 @@
   "description": "Hit rate, lookup speed, and stores from the similarity service.",
   "tags": ["semcache"],
   "schemaVersion": 39,
-  "version": 4,
+  "version": 5,
   "refresh": "5s",
   "timezone": "browser",
   "time": {
@@ -121,12 +121,47 @@
       }
     },
     {
+      "id": 6,
+      "type": "stat",
+      "title": "Near-miss gap",
+      "description": "How far a non-hit neighbor sat under the cutoff, for the time range on screen.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 6 },
+      "targets": [
+        {
+          "refId": "A",
+          "instant": true,
+          "expr": "histogram_quantile(0.50, sum by (le) (increase(semcache_near_miss_gap_bucket[$__range])))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 3,
+          "noValue": "No near-misses",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [{ "color": "text", "value": null }]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
       "id": 2,
       "type": "timeseries",
       "title": "Lookup speed",
       "description": "How long /lookup took. p50 is typical. p95 is a slow lookup.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
       "targets": [
         {
           "refId": "A",
@@ -164,7 +199,7 @@
       "title": "Stores",
       "description": "Answers saved in the last minute, and prompts skipped because they were too time-sensitive.",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 14 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
       "targets": [
         {
           "refId": "A",

@@ -1,6 +1,7 @@
+import pytest
 from datetime import UTC, datetime, timedelta
 
-from app.cache.policy import isHit
+from app.cache.policy import isHit, neighbor_miss
 from app.cache.ttl import threshold_for_prompt
 from app.config import settings
 
@@ -33,3 +34,11 @@ def test_isHit_uses_strict_cutoff_for_short_ttl_prompts():
 
 def test_isHit_rejects_expired_entries():
     assert not isHit(0.99, PAST, "What is the capital of France?")
+
+
+def test_neighbor_miss_reports_gap_under_the_cutoff():
+    prompt = "What is the capital of France?"
+    threshold = float(settings.threshold_loose)
+    cutoff, gap = neighbor_miss(threshold - 0.03, prompt)
+    assert cutoff == threshold
+    assert gap == pytest.approx(0.03)

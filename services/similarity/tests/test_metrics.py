@@ -1,7 +1,9 @@
+import pytest
 from fastapi.testclient import TestClient
 
+from app.config import settings
 from app.main import app
-from app.metrics import lookups, stores
+from app.metrics import lookups, near_miss_gap, stores
 
 LOOKUP_BODY = {
     "system_prompt": "You are helpful",
@@ -18,6 +20,14 @@ PAYLOAD = {
     "model_id": "gpt-4o-mini",
     "finish_reason": "stop",
 }
+
+
+def _histogram_count(histogram) -> float:
+    for metric in histogram.collect():
+        for sample in metric.samples:
+            if sample.name.endswith("_count"):
+                return sample.value
+    return 0.0
 
 
 def _sample(counter, result: str) -> float:
@@ -65,11 +75,19 @@ def test_lookup_counts_each_outcome(monkeypatch):
     assert _sample(lookups, "hit") == before_hit + 1
 
     is_hit = False
+    threshold = float(settings.threshold_loose)
+    search_result = {"score": threshold - 0.03, "payload": PAYLOAD, "expires_at": 0, "id": "1"}
     before_near = _sample(lookups, "not_a_hit")
+    before_gap = _histogram_count(near_miss_gap)
     response = client.post("/lookup", json=LOOKUP_BODY)
-    assert response.json()["cached"] is False
-    assert response.json()["similarity_score"] is None
+    body = response.json()
+    assert body["cached"] is False
+    assert body["payload"] is None
+    assert body["similarity_score"] == pytest.approx(threshold - 0.03)
+    assert body["threshold"] == pytest.approx(threshold)
+    assert body["gap"] == pytest.approx(0.03)
     assert _sample(lookups, "not_a_hit") == before_near + 1
+    assert _histogram_count(near_miss_gap) == before_gap + 1
 
 
 def test_store_counts_ttl_skip_and_successful_write(monkeypatch):

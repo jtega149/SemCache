@@ -7,10 +7,10 @@ from app.models.schemas import LookupRequest, LookupResponse, StoreRequest, Stor
 from app.embeddings.openai import embed
 from app.store.vector import upsert, search
 from app.cache.key import build_namespace
-from app.cache.policy import record_hit
+from app.cache.policy import neighbor_miss, record_hit
 from app.cache.ttl import ttl_for_prompt
 from app.api.routes.delete_route import router as delete_router
-from app.metrics import lookup_seconds, lookups, stores
+from app.metrics import lookup_seconds, lookups, near_miss_gap, stores
 
 app = FastAPI()
 app.include_router(delete_router)
@@ -37,7 +37,16 @@ async def lookup(request: LookupRequest):
             lookups.labels(result="hit").inc()
             return LookupResponse(cached=True, similarity_score=result["score"], payload=result["payload"])
         lookups.labels(result="not_a_hit").inc()
-        return LookupResponse(cached=False, similarity_score=None, payload=None)
+        threshold, gap = neighbor_miss(result["score"], request.user_prompt)
+        if gap > 0:
+            near_miss_gap.observe(gap)
+        return LookupResponse(
+            cached=False,
+            similarity_score=result["score"],
+            payload=None,
+            threshold=threshold,
+            gap=gap,
+        )
     finally:
         lookup_seconds.observe(time.perf_counter() - started)
 
